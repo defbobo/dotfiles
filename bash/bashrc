@@ -1,0 +1,221 @@
+# If not running interactively, don't do anything
+[ -z "$PS1" ] && return
+
+export EDITOR=vim
+export GIT_EDITOR=vim
+
+MITSUHIKOS_DEFAULT_COLOR="[00m"
+MITSUHIKOS_GRAY_COLOR="[37m"
+MITSUHIKOS_PINK_COLOR="[35m"
+MITSUHIKOS_GREEN_COLOR="[32m"
+MITSUHIKOS_ORANGE_COLOR="[33m"
+MITSUHIKOS_RED_COLOR="[31m"
+if [ `id -u` == '0' ]; then
+  MITSUHIKOS_USER_COLOR=$MITSUHIKOS_RED_COLOR
+else
+  MITSUHIKOS_USER_COLOR=$MITSUHIKOS_PINK_COLOR
+fi
+
+MITSUHIKOS_VC_PROMPT=$' on \033[34m%n\033[00m:\033[00m%[unknown]b\033[32m'
+MITSUHIKOS_VC_PROMPT_EX="$MITSUHIKOS_VC_PROMPT%m%u"
+
+mitsuhikos_vcprompt() {
+  path=`pwd`
+  prompt="$MITSUHIKOS_VC_PROMPT"
+  if [[ "$path" != /Users/mitsuhiko/Development/playfire* ]]; then
+    prompt="$MITSUHIKOS_VC_PROMPT_EX"
+  fi
+  vcprompt -f "$prompt"
+}
+
+mitsuhikos_lastcommandfailed() {
+  code=$?
+  if [ $code != 0 ]; then
+    echo -n $'\033[37m exited \033[31m'
+    echo -n $code
+    echo -n $'\033[37m'
+  fi
+}
+
+mitsuhikos_backgroundjobs() {
+  jobs|python -c 'if 1:
+    import sys
+    items = ["\033[36m%s\033[37m" % x.split()[2]
+             for x in sys.stdin.read().splitlines()]
+    if items:
+      if len(items) > 2:
+        string = "%s, and %s" % (", ".join(items[:-1]), items[-1])
+      else:
+        string = ", ".join(items)
+      print("\033[37m running %s" % string)
+  '
+}
+
+mitsuhikos_virtualenv() {
+  if [ x$VIRTUAL_ENV != x ]; then
+    if [[ $VIRTUAL_ENV == *.virtualenvs/* ]]; then
+      ENV_NAME=`basename "${VIRTUAL_ENV}"`
+    else
+      folder=`dirname "${VIRTUAL_ENV}"`
+      ENV_NAME=`basename "$folder"`
+    fi
+    echo -n $' \033[37mworkon \033[31m'
+    echo -n $ENV_NAME
+    echo -n $'\033[00m'
+    # Shell title
+    echo -n $'\033]0;venv:'
+    echo -n $ENV_NAME
+    echo -n $'\007'
+  fi
+
+  # Also setup our readline properly constantly since
+  # stuff tends to overwrite this.
+  stty werase undef
+  bind '"\C-w": unix-filename-rubout'
+}
+
+export MITSUHIKOS_BASEPROMPT='\e]0;\007\n\e${MITSUHIKOS_USER_COLOR}\u \
+\e${MITSUHIKOS_GRAY_COLOR}at \e${MITSUHIKOS_ORANGE_COLOR}\h \
+\e${MITSUHIKOS_GRAY_COLOR}in \e${MITSUHIKOS_GREEN_COLOR}\w\
+`mitsuhikos_lastcommandfailed`\
+\e${MITSUHIKOS_GRAY_COLOR}`mitsuhikos_vcprompt`\
+`mitsuhikos_backgroundjobs`\
+`mitsuhikos_virtualenv`\
+\e${MITSUHIKOS_DEFAULT_COLOR}'
+export PS1="\[\033[G\]${MITSUHIKOS_BASEPROMPT}
+$ "
+
+export TERM=xterm-256color
+export GREP_OPTIONS='--color=auto' GREP_COLOR='1;32'
+export CLICOLOR=1
+if [ `uname` == "Darwin" ]; then
+  export LSCOLORS=ExGxFxDxCxHxHxCbCeEbEb
+  export LC_CTYPE=en_US.utf-8
+  export LC_ALL=en_US.utf-8
+else
+  alias ls='ls --color=auto'
+fi
+export PATH=/usr/local/bin:/usr/local/sbin:/usr/local/git/bin:~/.bin:$PATH
+export IGNOREEOF=1
+export PYTHONDONTWRITEBYTECODE=1
+export LESS=FRSX
+
+# virtualenvwrapper and pip
+if [ `id -u` != '0' ]; then
+  export VIRTUALENV_DISTRIBUTE=1
+  if [ -f /usr/local/bin/virtualenvwrapper.sh ]; then
+    export WORKON_HOME=$HOME/.virtualenvs
+    source /usr/local/bin/virtualenvwrapper.sh
+  fi
+  if [ -f ~/.local/venvs/virtualenvwrapper/bin/virtualenvwrapper.sh ]; then
+    export WORKON_HOME=$HOME/.virtualenvs
+    export VIRTUALENVWRAPPER_PYTHON=~/.local/venvs/virtualenvwrapper/bin/python
+    source ~/.local/venvs/virtualenvwrapper/bin/virtualenvwrapper.sh
+  fi
+fi
+
+# start a socks proxy on ayreal
+browsesecure() {
+  python <<SWITCH
+import sys
+from subprocess import Popen, call, PIPE
+
+old_location = None
+out = Popen(['scselect'], stdout=PIPE, stderr=PIPE).communicate()[0]
+for line in out.splitlines():
+    line = line.strip()
+    if line.startswith('*'):
+        old_location = line[line.find('(') + 1:-1]
+
+if old_location is None:
+    print >> sys.stderr, "Can't find old network location"
+    sys.exit(1)
+
+def switch_location(name):
+    call(['scselect', name], stdout=open('/dev/null', 'w'))
+
+switch_location('SOCK Proxied Public')
+print 'SOCKS Proxy on localhost:7890'
+print 'Switched network configuration'
+try:
+    #call(['ssh', '-ND', '7890', '78.46.64.175'])
+    call(['ssh', '-ND', '7890', 'flaskbot'])
+except (KeyboardInterrupt, EOFError):
+    print 'Switched back to', old_location
+    switch_location(old_location)
+SWITCH
+}
+
+if [ x`which hub` != x ]; then
+  alias git=hub
+fi
+alias mq='hg -R $(hg root)/.hg/patches'
+alias rvim="gvim --remote-silent"
+alias pypy-jitlog="PYPYLOG=jit-log-opt,jit-backend-counts:pypyjitlog.log pypy-c"
+alias ..='cd ..'
+shopt -s histappend
+
+if [ -f /usr/local/git/contrib/completion ]; then
+  . /usr/local/git/contrib/completion/git-completion.bash
+fi
+if [ -f /etc/bash_completion ]; then
+  . /etc/bash_completion
+fi
+
+# don't let virtualenv show prompts by itself
+VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# for the lulz
+alias bitch,=sudo
+
+# hack to get ppc out of that thing
+export ARCHFLAGS="-arch i386 -arch x86_64"
+
+if [ x`which ack-grep` != x ]; then
+  alias ack=ack-grep
+fi
+
+# For lazy people like me
+from() { expect -c "spawn -noecho python
+expect \">>> \"
+send \"from $*\r\"
+interact +++ return"; }
+import() { expect -c "spawn -noecho python
+expect \">>> \"
+send \"import $*\r\"
+interact +++ return"; }
+
+# Useful command for stripping whitespace
+remove_trailing_whitespace() {
+  find . -name $* -exec sed -i '' -e's/[[:space:]]*$//' {} \;
+}
+
+# Meh OS X
+alias fixopenwith='/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -kill -r -domain local -domain system -domain user'
+
+# Python
+export PYTHONSTARTUP=~/.pythonstartup.py
+
+# Extra stuff
+if [ -f ~/.profile_local ]; then
+  source ~/.profile_local
+fi
+
+# Perforce shenanigans
+export P4CONFIG=.p4rc
+
+# Make sure window sizes update correctly.
+shopt -s checkwinsize
+
+function rustup {
+  curl -s https://static.rust-lang.org/rustup.sh | sh -s -- "$@"
+}
+
+function clip {
+  [ -t 0 ] && pbpaste || pbcopy
+}
+
+# Reasons
+alias ack=ag
+
+. ~/.bashrc.local
