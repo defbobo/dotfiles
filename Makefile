@@ -1,5 +1,5 @@
 install: install-vim install-bash \
-         install-git \ install-python
+         install-git install-python
 
 install-vim:
 		rm -rf ~/.vim ~/.vimrc
