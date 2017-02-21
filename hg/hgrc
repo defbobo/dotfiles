@@ -1,0 +1,41 @@
+[ui]
+username = xiaobowu <xiaobo.wu@alcatel-sbell.com.cn>
+editor = vim
+ignore = ~/.hgignore
+[extensions]
+hgext.bookmarks =
+color =
+eol =
+[alias]
+# Some useful little aliases.
+st = status -SC
+? = summary
+pill = pull -u
+pish = push -r .
+unci = revert -a --no-backup
+ls = manifest
+br = branches
+fdiff = diff -U 10000000000000
+qfdiff = qdiff -U 10000000000000
+co = update -c
+meh = commit --amend
+wdiff = diff --word-diff=color
+wshow = show --word-diff=color
+cm = commit -m
+d = diff -p --color=auto
+slog = log -l15 --style=$HOME/lib/dotfiles/mercurial/templates/map-cmdline.slog
+dlog = log -l15 --style=$HOME/lib/dotfiles/mercurial/templates/map-cmdline.dlog
+sglog = log -l10 --style=$HOME/lib/dotfiles/mercurial/templates/map-cmdline.sglog
+nlog = log -l10 --style=$HOME/lib/dotfiles/mercurial/templates/map-cmdline.nlog
+d = diff -p --color=auto
+
+# Merge shortcuts.
+md = merge default
+mergelocal = !$HG --config ui.merge=internal:local merge $@
+mergeother = !$HG --config ui.merge=internal:other merge $@
+mergefail = !$HG --config ui.merge=internal:fail merge $@
+
+[diff]
+git = True
+unified = 5
+
